@@ -77,8 +77,14 @@ router.post(
 			.withMessage("description not valid")
 			.exists()
 			.withMessage("missing description"),
-		check("RepoUrl").isURL().withMessage("RepoUrl not valid"),
-		check("LiveUrl").isURL().withMessage("RepoUrl not valid"),
+		check("RepoUrl")
+			.if(check("RepoUrl").exists())
+			.isURL()
+			.withMessage("RepoUrl not valid"),
+		check("LiveUrl")
+			.if(check("LiveUrl").exists())
+			.isURL()
+			.withMessage("RepoUrl not valid"),
 	],
 	async (req, res, next) => {
 		const newPj = req.body

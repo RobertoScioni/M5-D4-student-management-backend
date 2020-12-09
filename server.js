@@ -2,7 +2,7 @@ const express = require("express")
 const cors = require("cors")
 const studentsRoutes = require("./services/students")
 const projectsRoutes = require("./services/projects")
-const { badRequest, catchAllHandler } = require("./error")
+const { badRequest, funny, catchAllHandler } = require("./error")
 const server = express()
 const port = process.env.PORT || 3001
 
@@ -12,6 +12,7 @@ server.use("/students", studentsRoutes)
 server.use("/projects", projectsRoutes)
 
 server.use(badRequest)
+server.use(funny)
 server.use(catchAllHandler)
 
 server.listen(port, () => {
