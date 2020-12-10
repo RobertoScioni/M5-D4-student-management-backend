@@ -2,7 +2,7 @@ const { response } = require("express")
 const { check, validationResult } = require("express-validator")
 const express = require("express")
 const fs = require("fs") //I kinda need file system acces don't I?
-const { writeFile, createReadStream, writeJson } = require("fs-extra")
+const { writeFile, createReadStream, writeJson, readJSON } = require("fs-extra")
 const path = require("path") //mostly to appease window's folks
 const uniqid = require("uniqid") //my relational database formation screams at me against this thing
 const multer = require("multer")
@@ -269,11 +269,25 @@ router.post(
  */
 router.get("/:id/reviews", async (req, res, next) => {
 	const id = req.params.id
-	console.log("searching for", id)
-	res.send(openDb[id])
 })
 /**
  * POST /projects/id/reviews => add a new review for the given project
  */
-
+router.post(
+	"/:id/reviews",
+	[check("description").exists()],
+	async (req, res, next) => {
+		const Pid = req.params.id
+		const id = uniqid()
+		let reviews = {}
+		try {
+			reviews = await readJSON(path.join(__dirname, "reviews.json"))
+		} catch (err) {
+			console.error(err)
+			next(err)
+		}
+		reviews[id] = req.body
+		reviews[id].Pid = Pid
+	}
+)
 module.exports = router
