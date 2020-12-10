@@ -1,10 +1,12 @@
 const { response } = require("express")
 const { check, validationResult } = require("express-validator")
 const express = require("express")
-
 const fs = require("fs") //I kinda need file system acces don't I?
+const { writeFile, createReadStream, writeJson } = require("fs-extra")
 const path = require("path") //mostly to appease window's folks
 const uniqid = require("uniqid") //my relational database formation screams at me against this thing
+const multer = require("multer")
+const upload = multer({})
 
 const router = express.Router()
 
@@ -66,7 +68,8 @@ router.get("/:id", async (req, res, next) => {
 
 router.post(
 	"/",
-	[	//could i declare this stuff as a variable? you knbow for reusability's sake...
+	[
+		//could i declare this stuff as a variable? you knbow for reusability's sake...
 		check("name")
 			.isLength({ min: 4 })
 			.withMessage("name not valid")
@@ -140,73 +143,137 @@ router.post(
  * manage /projects/:id path in PUT
  */
 
-router.put("/:id",
-[	//could i declare this stuff as a variable? you knbow for reusability's sake...
-check("id").exists(),
-check("name")
-	.isLength({ min: 4 })
-	.withMessage("name not valid")
-	.exists()
-	.withMessage("missing name"),
-check("description")
-	.isLength({ min: 4 })
-	.withMessage("description not valid")
-	.exists()
-	.withMessage("missing description"),
-check("RepoUrl")
-	.if(check("RepoUrl").exists())
-	.isURL()
-	.withMessage("RepoUrl not valid"),
-check("LiveUrl")
-	.if(check("LiveUrl").exists())
-	.isURL()
-	.withMessage("RepoUrl not valid"),
-], async (req, res,next) => {
-	const id = req.params.id
+router.put(
+	"/:id",
+	[
+		//could i declare this stuff as a variable? you knbow for reusability's sake...
+		check("id").exists(),
+		check("name")
+			.isLength({ min: 4 })
+			.withMessage("name not valid")
+			.exists()
+			.withMessage("missing name"),
+		check("description")
+			.isLength({ min: 4 })
+			.withMessage("description not valid")
+			.exists()
+			.withMessage("missing description"),
+		check("RepoUrl")
+			.if(check("RepoUrl").exists())
+			.isURL()
+			.withMessage("RepoUrl not valid"),
+		check("LiveUrl")
+			.if(check("LiveUrl").exists())
+			.isURL()
+			.withMessage("RepoUrl not valid"),
+	],
+	async (req, res, next) => {
+		const id = req.params.id
 
-	try {
-		updateStd(newPj.StudentID)
-	} catch (error) {
-		next(error)
-		return -1
+		try {
+			updateStd(newPj.StudentID)
+		} catch (error) {
+			next(error)
+			return -1
+		}
+
+		let pjs = openDb()
+		if (pjs.hasOwnProperty(id)) {
+			const newPj = req.body
+			pjs[id] = newPj
+			fs.writeFileSync(projectsfilePath, JSON.stringify(pjs))
+			res.send(id)
+			return 1
+		} else {
+			let err = new Error("not existing project")
+			err.httpStatusCode = 400
+			next(err)
+			return -1
+		}
 	}
+)
 
-	let pjs=openDb()
-	if(pjs.hasOwnProperty(id))
-	{
-		const newPj = req.body
-		pjs[id] = newPj
+/**
+ * manage Project deletion
+ */
+router.delete("/:id", [check("id").exists()], async (req, res, next) => {
+	const id = req.params.id
+	let pjs = openDb()
+	if (pjs.hasOwnProperty(id)) {
+		delete stds[id]
 		fs.writeFileSync(projectsfilePath, JSON.stringify(pjs))
 		res.send(id)
 		return 1
-	}else{
-		let err= new Error("not existing project")
-		err.httpStatusCode=400
+	} else {
+		let err = new Error("not existing project")
+		err.httpStatusCode = 400
 		next(err)
 		return -1
 	}
 })
 
 /**
- * manage students deletion
+ *  [EXTRA] GET /students/:studentsId/projects/ => get all the projects for a student with a given ID
  */
-router.delete("/:id",[check("id").exists()], async (req, res) => {
-	let pjs=openDb()
-	if(pjs.hasOwnProperty(id))
-	{
-		delete stds[id]	
-		fs.writeFileSync(projectsfilePath, JSON.stringify(pjs))
-		res.send(id)
-		return 1
-	}else{
-		let err= new Error("not existing project")
-		err.httpStatusCode=400
-		next(err)
-		return -1
+
+/**
+ * [EXTRA] GET /projects?name=searchQuery => filter the projects and extracts the only that match the condition (es.: Name contains searchQuery)
+ */
+
+//D4
+
+/**
+ * POST /projects/id/uploadPhoto => uploads a picture
+ * (save as idOfTheStudent.jpg in the public/img/projects folder) for the student specified by the id.
+ * Add a field on the projects model called image, in where you store the newly created URL
+ * (http://localhost:3000/img/projects/idOfTheProject.jpg)
+ */
+router.post(
+	"/:id/uploadPhoto",
+	[check("id").exists()],
+	upload.single("picture"),
+	async (req, res, next) => {
+		/**
+		 * verify the existance of id in the db
+		 */
+		const Pjs = openDb()
+		if (Pjs.hasOwnProperty(req.params.id)) {
+			/**
+			 * do the thing
+			 */
+			try {
+				const dest = path.join(__dirname, "../../../public/img/projects")
+				console.log(dest)
+				await writeFile(path.join(dest, req.file.originalname), req.file.buffer)
+				res.send("success")
+			} catch (err) {
+				console.error(err)
+				next(err)
+			}
+		}
+		/**
+		 * update project with the image url
+		 */
+		Pjs[req.params.id].image =
+			"http://localhost:3000/img/projects/" + req.file.originalname
+		try {
+			await writeJson(path.join(__dirname, "projects.json"), Pjs)
+		} catch (err) {
+			console.error(err)
+			next(err)
+		}
 	}
-
+)
+/**
+ * GET /projects/id/reviews => get all the reviews for a given project
+ */
+router.get("/:id/reviews", async (req, res, next) => {
+	const id = req.params.id
+	console.log("searching for", id)
+	res.send(openDb[id])
 })
-
-
+/**
+ * POST /projects/id/reviews => add a new review for the given project
+ */
 
 module.exports = router

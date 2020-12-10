@@ -1,9 +1,12 @@
 const { response } = require("express")
+const { check, validationResult } = require("express-validator")
 const express = require("express")
-
+const { writeFile, createReadStream, writeJson, readJSON } = require("fs-extra")
 const fs = require("fs") //I kinda need file system acces don't I?
 const path = require("path") //mostly to appease window's folks
 const uniqid = require("uniqid") //my relational database formation screams at me against this thing
+const multer = require("multer")
+const upload = multer({})
 
 const router = express.Router()
 
@@ -106,6 +109,59 @@ checkEmail = (mail, stds) => {
 	}
 	return true
 }
+
+//D4
+
+/**
+ * POST /students/id/uploadPhoto => uploads a picture
+ * (save as idOfTheStudent.jpg in the public/img/students folder) for the student specified by the id.
+ * Add a field on the students model called image, in where you store the newly created URL
+ * (http://localhost:3000/img/students/idOfTheStudent.jpg)
+ */
+
+router.post(
+	"/:id/uploadPhoto",
+	[check("id").exists()],
+	upload.single("picture"),
+	async (req, res, next) => {
+		/**
+		 * verify the existance of id in the db
+		 */
+		let Stds = {}
+		try {
+			Stds = await readJSON(path.join(__dirname, "students.json"))
+		} catch (err) {
+			console.error(err)
+			next(err)
+		}
+
+		if (Stds.hasOwnProperty(req.params.id)) {
+			/**
+			 * do the thing
+			 */
+			try {
+				const dest = path.join(__dirname, "../../../public/img/students")
+				console.log(dest)
+				await writeFile(path.join(dest, req.file.originalname), req.file.buffer)
+				res.send("success")
+			} catch (err) {
+				console.error(err)
+				next(err)
+			}
+		}
+		/**
+		 * update project with the image url
+		 */
+		Stds[req.params.id].image =
+			"http://localhost:3000/img/students/" + req.file.originalname
+		try {
+			await writeJson(path.join(__dirname, "students.json"), Stds)
+		} catch (err) {
+			console.error(err)
+			next(err)
+		}
+	}
+)
 
 /**
  * [EXTRA] //FRONTEND
