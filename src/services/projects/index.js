@@ -45,7 +45,7 @@ const updateStd = (id, pid) => {
 /**
  * manage the /projects path in GET
  */
-router.get("/", async (req, res) => {
+router.get("/", async (req, res, next) => {
 	console.log("our 'database' is in", projectsfilePath)
 	res.send(openDb())
 })
@@ -54,7 +54,7 @@ router.get("/", async (req, res) => {
  * manage the /projects/id path in GET
  */
 
-router.get("/:id", async (req, res) => {
+router.get("/:id", async (req, res, next) => {
 	const id = req.params.id
 	console.log("searching for", id)
 	res.send(openDb[id])
@@ -66,7 +66,7 @@ router.get("/:id", async (req, res) => {
 
 router.post(
 	"/",
-	[
+	[	//could i declare this stuff as a variable? you knbow for reusability's sake...
 		check("name")
 			.isLength({ min: 4 })
 			.withMessage("name not valid")
@@ -91,14 +91,14 @@ router.post(
 		/** example expected schema
 	 *  "name": "test",
 		"description": "test description",
-		"creation date": "now",
-		"RepoURL": "test github",
-		"LiveUrl": "trdythodying",
+		"creation date": "now",	//we create this
+		"RepoURL": "test github", //i suppose this can be optional?
+		"LiveUrl": "trdythodying",// and this too?
 		"StudentId": "a student's ID"
 	 */
 		const fields = ["name", "description", "StudentID"]
 
-		/*try {
+		/*try {   hahahha my old obsolete validation code T_T
 			fields.forEach((field) => {
 				if (!newPj[field]) {
 					const err = new Error("missing " + field + " field")
@@ -110,7 +110,6 @@ router.post(
 			next(error)
 			return
 		}*/
-		//try {
 		const errors = validationResult(req)
 
 		if (!errors.isEmpty()) {
@@ -141,76 +140,73 @@ router.post(
  * manage /projects/:id path in PUT
  */
 
-router.put("/:id", async (req, res) => {
+router.put("/:id",
+[	//could i declare this stuff as a variable? you knbow for reusability's sake...
+check("id").exists(),
+check("name")
+	.isLength({ min: 4 })
+	.withMessage("name not valid")
+	.exists()
+	.withMessage("missing name"),
+check("description")
+	.isLength({ min: 4 })
+	.withMessage("description not valid")
+	.exists()
+	.withMessage("missing description"),
+check("RepoUrl")
+	.if(check("RepoUrl").exists())
+	.isURL()
+	.withMessage("RepoUrl not valid"),
+check("LiveUrl")
+	.if(check("LiveUrl").exists())
+	.isURL()
+	.withMessage("RepoUrl not valid"),
+], async (req, res,next) => {
 	const id = req.params.id
-
-	const fields = ["name", "description", "StudentID"]
-
-	try {
-		fields.forEach((field) => {
-			if (!newPj[field]) {
-				const err = new Error("missing " + field + " field")
-				err.httpStatusCode = 400
-				throw err
-			}
-		})
-	} catch (error) {
-		next(error)
-		return
-	}
 
 	try {
 		updateStd(newPj.StudentID)
 	} catch (error) {
 		next(error)
-		return
+		return -1
 	}
 
-	const buffyer = fs.readFileSync(projectsfilePath)
-	let stds = JSON.parse(buffyer.toString())
-	const newStd = req.body
-	console.log("updating student", newStd)
-	stds[id] = newStd
-	fs.writeFileSync(projectsfilePath, JSON.stringify(stds))
-	res.send(id)
+	let pjs=openDb()
+	if(pjs.hasOwnProperty(id))
+	{
+		const newPj = req.body
+		pjs[id] = newPj
+		fs.writeFileSync(projectsfilePath, JSON.stringify(pjs))
+		res.send(id)
+		return 1
+	}else{
+		let err= new Error("not existing project")
+		err.httpStatusCode=400
+		next(err)
+		return -1
+	}
 })
 
 /**
  * manage students deletion
  */
-router.delete("/:id", async (req, res) => {
-	const id = req.params.id
-	const buffyer = fs.readFileSync(studentsfilePath)
-	let stds = JSON.parse(buffyer.toString())
-	console.log("deleting student", id)
-	delete stds[id]
-	fs.writeFileSync(studentsfilePath, JSON.stringify(stds))
-	res.send(id)
+router.delete("/:id",[check("id").exists()], async (req, res) => {
+	let pjs=openDb()
+	if(pjs.hasOwnProperty(id))
+	{
+		delete stds[id]	
+		fs.writeFileSync(projectsfilePath, JSON.stringify(pjs))
+		res.send(id)
+		return 1
+	}else{
+		let err= new Error("not existing project")
+		err.httpStatusCode=400
+		next(err)
+		return -1
+	}
+
 })
 
-/**
- * [EXTRA] POST /checkEmail => check if another student has the same email. The parameter should be passed in the body.
- *  It should return true or false.
- *  It should not be possible to add a new student (with POST /students) if another has the same email.
- **/
-checkEmail = (mail, stds) => {
-	//console.log(typeof stds.entries)
-	for (const [key, value] of Object.entries(stds)) {
-		if (value.mail === mail) {
-			console.log("redundant data")
-			return false
-		}
-	}
-	return true
-}
 
-/**
- * [EXTRA] //FRONTEND
- *   You are in charge of building the Frontend too. Use ReactJS to create an application for managing the students.
- *   The features for the application are:
- *   - Add a new Student ([EXTRA]use CheckEmail before sending the post to the backend)
- *   - Show Students on a list
- *   - Every Student could be edited or deleted
- **/
 
 module.exports = router

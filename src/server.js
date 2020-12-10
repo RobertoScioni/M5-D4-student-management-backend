@@ -2,7 +2,7 @@ const express = require("express")
 const cors = require("cors")
 const studentsRoutes = require("./services/students")
 const projectsRoutes = require("./services/projects")
-const { badRequest, funny, catchAllHandler } = require("./error")
+const { badRequest, funny, catchAllHandler } = require("../error")
 const server = express()
 const port = process.env.PORT || 3001
 
